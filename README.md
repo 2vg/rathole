@@ -178,6 +178,10 @@ type = "tcp" # Optional. Same as the client `[client.services.X.type]
 token = "whatever" # Necessary if `server.default_token` not set
 bind_addr = "0.0.0.0:8081" # Necessary. The address of the service is exposed at. Generally only the port needs to be change.
 nodelay = true # Optional. Same as the client
+# blacklist takes precedence over whitelist.
+# If both have the same IPs, the blacklist will take precedence so the process will be skipped.
+blacklist = ["1.2.3.4"] # Optional. IPs added here will be skipped when transferring data.
+whitelist = ["1.2.3.4"] # Optional. IPs added here will work as usual and will skip processing other IPs.
 
 [server.services.service2]
 bind_addr = "0.0.0.1:8082"
