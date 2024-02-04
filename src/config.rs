@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::net::IpAddr;
 use std::ops::Deref;
 use std::path::Path;
 use tokio::fs;
@@ -102,6 +103,8 @@ pub struct ServerServiceConfig {
     pub bind_addr: String,
     pub token: Option<MaskedString>,
     pub nodelay: Option<bool>,
+    pub blacklist: Option<Vec<IpAddr>>,
+    pub whitelist: Option<Vec<IpAddr>>,
 }
 
 impl ServerServiceConfig {
@@ -262,6 +265,7 @@ impl Config {
                     bail!("The token of service {} is not set", name);
                 }
             }
+            dbg!("{}: {}", name, s);
         }
 
         Config::validate_transport_config(&server.transport, true)?;

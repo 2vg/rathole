@@ -15,6 +15,12 @@ A secure, stable and high-performance reverse proxy for NAT traversal, written i
 
 rathole, like [frp](https://github.com/fatedier/frp) and [ngrok](https://github.com/inconshreveable/ngrok), can help to expose the service on the device behind the NAT to the Internet, via a server with a public IP.
 
+**But with blacklist or whitelist.**
+
+> [!WARNING]
+> Note that it is better to control with an existing firewall such as ufw to eliminate complete overhead.<br/>
+> I just forked the original and added this because I wanted to have easier control, even If allowed for some overhead.
+
 <!-- TOC -->
 
 - [rathole](#rathole)
@@ -34,6 +40,7 @@ rathole, like [frp](https://github.com/fatedier/frp) and [ngrok](https://github.
 - **Low Resource Consumption** Consumes much fewer memory than similar tools. See [Benchmark](#benchmark). [The binary can be](docs/build-guide.md) **as small as ~500KiB** to fit the constraints of devices, like embedded devices as routers.
 - **Security** Tokens of services are mandatory and service-wise. The server and clients are responsible for their own configs. With the optional Noise Protocol, encryption can be configured at ease. No need to create a self-signed certificate! TLS is also supported.
 - **Hot Reload** Services can be added or removed dynamically by hot-reloading the configuration file. HTTP API is WIP.
+- **Customizable blacklist/whitelist** Server can set blacklists and whitelists for each IP.
 
 ## Quickstart
 

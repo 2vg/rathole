@@ -425,6 +425,8 @@ where
             };
         }
 
+        let cloned = service.clone();
+
         let shutdown_rx_clone = shutdown_tx.subscribe();
         let bind_addr = service.bind_addr.clone();
         match service.service_type {
@@ -435,6 +437,7 @@ where
                         data_ch_rx,
                         data_ch_req_tx,
                         shutdown_rx_clone,
+                        cloned,
                     )
                     .await
                     .with_context(|| "Failed to run TCP connection pool")
@@ -451,6 +454,7 @@ where
                         data_ch_rx,
                         data_ch_req_tx,
                         shutdown_rx_clone,
+                        cloned,
                     )
                     .await
                     .with_context(|| "Failed to run TCP connection pool")
@@ -553,6 +557,7 @@ fn tcp_listen_and_send(
     addr: String,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
+    config: ServerServiceConfig,
 ) -> mpsc::Receiver<TcpStream> {
     let (tx, rx) = mpsc::channel(CHAN_SIZE);
 
@@ -598,7 +603,17 @@ fn tcp_listen_and_send(
                                 break;
                             }
                         }
-                        Ok((incoming, addr)) => {
+                        Ok((mut incoming, addr)) => {
+                            if is_blacklisted(&config, &addr) {
+                                let _ = incoming.shutdown();
+                                continue;
+                            }
+            
+                            if !is_whitelisted(&config, &addr) {
+                                let _ = incoming.shutdown();
+                                continue;
+                            }
+
                             // For every visitor, request to create a data channel
                             if data_ch_req_tx.send(true).with_context(|| "Failed to send data chan create request").is_err() {
                                 // An error indicates the control channel is broken
@@ -633,8 +648,9 @@ async fn run_tcp_connection_pool<T: Transport>(
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     data_ch_req_tx: mpsc::UnboundedSender<bool>,
     shutdown_rx: broadcast::Receiver<bool>,
+    config: ServerServiceConfig,
 ) -> Result<()> {
-    let mut visitor_rx = tcp_listen_and_send(bind_addr, data_ch_req_tx.clone(), shutdown_rx);
+    let mut visitor_rx = tcp_listen_and_send(bind_addr, data_ch_req_tx.clone(), shutdown_rx, config);
     let cmd = bincode::serialize(&DataChannelCmd::StartForwardTcp).unwrap();
 
     'pool: while let Some(mut visitor) = visitor_rx.recv().await {
@@ -667,6 +683,7 @@ async fn run_udp_connection_pool<T: Transport>(
     mut data_ch_rx: mpsc::Receiver<T::Stream>,
     _data_ch_req_tx: mpsc::UnboundedSender<bool>,
     mut shutdown_rx: broadcast::Receiver<bool>,
+    config: ServerServiceConfig,
 ) -> Result<()> {
     // TODO: Load balance
 
@@ -698,6 +715,14 @@ async fn run_udp_connection_pool<T: Transport>(
             // Forward inbound traffic to the client
             val = l.recv_from(&mut buf) => {
                 let (n, from) = val?;
+                if is_blacklisted(&config, &from) {
+                    continue;
+                }
+
+                if !is_whitelisted(&config, &from) {
+                    continue;
+                }
+
                 UdpTraffic::write_slice(&mut conn, from, &buf[..n]).await?;
             },
 
@@ -716,4 +741,22 @@ async fn run_udp_connection_pool<T: Transport>(
     debug!("UDP pool dropped");
 
     Ok(())
+}
+
+fn is_blacklisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref blacklist) = config.blacklist {
+        let from_ip = sock.ip();
+        blacklist.contains(&from_ip)
+    } else {
+        true
+    }
+}
+
+fn is_whitelisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref whitelist) = config.whitelist {
+        let from_ip = sock.ip();
+        whitelist.contains(&from_ip)
+    } else {
+        true
+    }
 }
