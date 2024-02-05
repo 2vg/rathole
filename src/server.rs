@@ -748,7 +748,7 @@ fn is_blacklisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> 
         let from_ip = sock.ip();
         blacklist.contains(&from_ip)
     } else {
-        true
+        false
     }
 }
 
