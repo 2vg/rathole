@@ -265,7 +265,6 @@ impl Config {
                     bail!("The token of service {} is not set", name);
                 }
             }
-            dbg!("{}: {}", name, s);
         }
 
         Config::validate_transport_config(&server.transport, true)?;
