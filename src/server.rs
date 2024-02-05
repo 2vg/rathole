@@ -661,7 +661,8 @@ async fn run_tcp_connection_pool<T: Transport>(
     shutdown_rx: broadcast::Receiver<bool>,
     config: ServerServiceConfig,
 ) -> Result<()> {
-    let mut visitor_rx = tcp_listen_and_send(bind_addr, data_ch_req_tx.clone(), shutdown_rx, config);
+    let mut visitor_rx =
+        tcp_listen_and_send(bind_addr, data_ch_req_tx.clone(), shutdown_rx, config);
     let cmd = bincode::serialize(&DataChannelCmd::StartForwardTcp).unwrap();
 
     'pool: while let Some(mut visitor) = visitor_rx.recv().await {
@@ -782,7 +783,7 @@ fn is_blacklisted_country(config: &ServerServiceConfig, sock: &std::net::SocketA
                     } else {
                         false
                     }
-                },
+                }
                 Err(_) => {
                     warn!("Failed to lookup geo ip");
                     false
@@ -817,7 +818,7 @@ fn is_whitelisted_country(config: &ServerServiceConfig, sock: &std::net::SocketA
                     } else {
                         true
                     }
-                },
+                }
                 Err(_) => {
                     warn!("Failed to lookup geo ip");
                     true
