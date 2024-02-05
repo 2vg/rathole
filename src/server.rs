@@ -13,6 +13,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 
+use maxminddb::geoip2::Country;
 use rand::RngCore;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -604,12 +605,22 @@ fn tcp_listen_and_send(
                             }
                         }
                         Ok((mut incoming, addr)) => {
-                            if is_blacklisted(&config, &addr) {
+                            if is_blacklisted_ip(&config, &addr) {
                                 let _ = incoming.shutdown();
                                 continue;
                             }
-            
-                            if !is_whitelisted(&config, &addr) {
+
+                            if !is_whitelisted_ip(&config, &addr) {
+                                let _ = incoming.shutdown();
+                                continue;
+                            }
+
+                            if is_blacklisted_country(&config, &addr) {
+                                let _ = incoming.shutdown();
+                                continue;
+                            }
+
+                            if !is_whitelisted_country(&config, &addr) {
                                 let _ = incoming.shutdown();
                                 continue;
                             }
@@ -715,11 +726,19 @@ async fn run_udp_connection_pool<T: Transport>(
             // Forward inbound traffic to the client
             val = l.recv_from(&mut buf) => {
                 let (n, from) = val?;
-                if is_blacklisted(&config, &from) {
+                if is_blacklisted_ip(&config, &from) {
                     continue;
                 }
 
-                if !is_whitelisted(&config, &from) {
+                if !is_whitelisted_ip(&config, &from) {
+                    continue;
+                }
+
+                if is_blacklisted_country(&config, &from) {
+                    continue;
+                }
+
+                if !is_whitelisted_country(&config, &from) {
                     continue;
                 }
 
@@ -743,8 +762,8 @@ async fn run_udp_connection_pool<T: Transport>(
     Ok(())
 }
 
-fn is_blacklisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref blacklist) = config.blacklist {
+fn is_blacklisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref blacklist) = config.blacklist_ip {
         let from_ip = sock.ip();
         blacklist.contains(&from_ip)
     } else {
@@ -752,10 +771,62 @@ fn is_blacklisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> 
     }
 }
 
-fn is_whitelisted(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref whitelist) = config.whitelist {
+fn is_blacklisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref blacklist) = config.blacklist_country {
+        if let Ok(reader) = maxminddb::Reader::from_source(config.maxminddb_buffer.clone()) {
+            let from_ip = sock.ip();
+            match reader.lookup::<Country>(from_ip) {
+                Ok(country) => {
+                    if let Some(country) = country.country {
+                        blacklist.contains(&country.iso_code.unwrap_or_default().to_string())
+                    } else {
+                        false
+                    }
+                },
+                Err(_) => {
+                    warn!("Failed to lookup geo ip");
+                    false
+                }
+            }
+        } else {
+            warn!("Failed to create maxmind reader");
+            false
+        }
+    } else {
+        false
+    }
+}
+
+fn is_whitelisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref whitelist) = config.whitelist_ip {
         let from_ip = sock.ip();
         whitelist.contains(&from_ip)
+    } else {
+        true
+    }
+}
+
+fn is_whitelisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
+    if let Some(ref whitelist) = config.whitelist_country {
+        if let Ok(reader) = maxminddb::Reader::from_source(config.maxminddb_buffer.clone()) {
+            let from_ip = sock.ip();
+            match reader.lookup::<Country>(from_ip) {
+                Ok(country) => {
+                    if let Some(country) = country.country {
+                        whitelist.contains(&country.iso_code.unwrap_or_default().to_string())
+                    } else {
+                        true
+                    }
+                },
+                Err(_) => {
+                    warn!("Failed to lookup geo ip");
+                    true
+                }
+            }
+        } else {
+            warn!("Failed to create maxmind reader");
+            true
+        }
     } else {
         true
     }

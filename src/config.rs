@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
+use bytes::buf::Reader;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -103,8 +104,12 @@ pub struct ServerServiceConfig {
     pub bind_addr: String,
     pub token: Option<MaskedString>,
     pub nodelay: Option<bool>,
-    pub blacklist: Option<Vec<IpAddr>>,
-    pub whitelist: Option<Vec<IpAddr>>,
+    pub blacklist_ip: Option<Vec<IpAddr>>,
+    pub whitelist_ip: Option<Vec<IpAddr>>,
+    pub maxminddb_path: Option<String>,
+    pub maxminddb_buffer: Vec<u8>,
+    pub blacklist_country: Option<Vec<String>>,
+    pub whitelist_country: Option<Vec<String>>,
 }
 
 impl ServerServiceConfig {
@@ -265,6 +270,7 @@ impl Config {
                     bail!("The token of service {} is not set", name);
                 }
             }
+            Config::validate_maxmind_config(s)?;
         }
 
         Config::validate_transport_config(&server.transport, true)?;
@@ -324,6 +330,34 @@ impl Config {
             }
             TransportType::Websocket => Ok(()),
         }
+    }
+
+    fn validate_maxmind_config(config: &mut ServerServiceConfig) -> Result<()> {
+        if let Some(blacklist) = &config.blacklist_country {
+            if !blacklist.is_empty() && config.maxminddb_path.is_none() {
+                bail!("Missing `maxminddb_path`")
+            }
+
+            if config.maxminddb_buffer.is_empty() {
+                let db_path = &config.maxminddb_path.clone().unwrap();
+                config.maxminddb_buffer = std::fs::read(db_path)
+                    .or_else(|_| bail!("Failed to read the maxmind database from `{}`", db_path))?;
+            }
+        }
+
+        if let Some(whitelist) = &config.whitelist_country {
+            if !whitelist.is_empty() && config.maxminddb_path.is_none() {
+                bail!("Missing `maxminddb_path`")
+            }
+
+            if config.maxminddb_buffer.is_empty() {
+                let db_path = &config.maxminddb_path.clone().unwrap();
+                config.maxminddb_buffer = std::fs::read(db_path)
+                    .or_else(|_| bail!("Failed to read the maxmind database from `{}`", db_path))?;
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn from_file(path: &Path) -> Result<Config> {
