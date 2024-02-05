@@ -15,7 +15,7 @@ A secure, stable and high-performance reverse proxy for NAT traversal, written i
 
 rathole, like [frp](https://github.com/fatedier/frp) and [ngrok](https://github.com/inconshreveable/ngrok), can help to expose the service on the device behind the NAT to the Internet, via a server with a public IP.
 
-**But with blacklist or whitelist.**
+**But with blacklist or whitelist. (IP, Geo Location)**
 
 > [!WARNING]
 > Note that it is better to control with an existing firewall such as ufw to eliminate complete overhead.<br/>
@@ -180,8 +180,11 @@ bind_addr = "0.0.0.0:8081" # Necessary. The address of the service is exposed at
 nodelay = true # Optional. Same as the client
 # blacklist takes precedence over whitelist.
 # If both have the same IPs, the blacklist will take precedence so the process will be skipped.
-blacklist = ["1.2.3.4"] # Optional. IPs added here will be skipped when transferring data.
-whitelist = ["1.2.3.4"] # Optional. IPs added here will work as usual and will skip processing other IPs.
+blacklist_ip = ["1.2.3.4"] # Optional. IPs added here will be skipped when transferring data.
+whitelist_ip = ["1.2.3.4"] # Optional. IPs added here will work as usual and will skip processing other IPs.
+# The black/white country list is placed after the IP's blacklist/whitelist.
+blacklist_country = ["JP"] # Optional. Countries added here will be skipped when transferring data, it should be define by ISO codes.
+whitelist_country = ["JP"] # Optional. Countries added here will work as usual and will skip processing other Countries, it should be define by ISO codes.
 
 [server.services.service2]
 bind_addr = "0.0.0.1:8082"
