@@ -773,29 +773,19 @@ fn is_blacklisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) 
 }
 
 fn is_blacklisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref blacklist) = config.blacklist_country {
-        if let Ok(reader) = maxminddb::Reader::from_source(config.maxminddb_buffer.clone()) {
-            let from_ip = sock.ip();
-            match reader.lookup::<Country>(from_ip) {
-                Ok(country) => {
-                    if let Some(country) = country.country {
-                        blacklist.contains(&country.iso_code.unwrap_or_default().to_string())
-                    } else {
-                        false
-                    }
-                }
-                Err(_) => {
-                    warn!("Failed to lookup geo ip");
-                    false
-                }
-            }
-        } else {
-            warn!("Failed to create maxmind reader");
-            false
-        }
-    } else {
-        false
-    }
+    config.blacklist_country.as_ref().and_then(|blacklist| {
+        maxminddb::Reader::from_source(&config.maxminddb_buffer)
+            .inspect_err(|_| { warn!("Failed to create maxmind reader") })
+            .ok()
+            .and_then(|reader| {
+                reader.lookup::<Country>(sock.ip())
+                    .inspect_err(|_| { warn!("Failed to lookup geo ip") })
+                    .ok()
+                    .and_then(|country| {
+                    country.country.and_then(|c| c.iso_code)
+                }).map(|iso_code| blacklist.contains(&iso_code.to_string()))
+        })
+    }).unwrap_or(false)
 }
 
 fn is_whitelisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
@@ -808,27 +798,17 @@ fn is_whitelisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) 
 }
 
 fn is_whitelisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref whitelist) = config.whitelist_country {
-        if let Ok(reader) = maxminddb::Reader::from_source(config.maxminddb_buffer.clone()) {
-            let from_ip = sock.ip();
-            match reader.lookup::<Country>(from_ip) {
-                Ok(country) => {
-                    if let Some(country) = country.country {
-                        whitelist.contains(&country.iso_code.unwrap_or_default().to_string())
-                    } else {
-                        true
-                    }
-                }
-                Err(_) => {
-                    warn!("Failed to lookup geo ip");
-                    true
-                }
-            }
-        } else {
-            warn!("Failed to create maxmind reader");
-            true
-        }
-    } else {
-        true
-    }
+    config.whitelist_country.as_ref().and_then(|whitelist| {
+        maxminddb::Reader::from_source(&config.maxminddb_buffer)
+            .inspect_err(|_| { warn!("Failed to create maxmind reader") })
+            .ok()
+            .and_then(|reader| {
+                reader.lookup::<Country>(sock.ip())
+                    .inspect_err(|_| { warn!("Failed to lookup geo ip") })
+                    .ok()
+                    .and_then(|country| {
+                    country.country.and_then(|c| c.iso_code)
+                }).map(|iso_code| whitelist.contains(&iso_code.to_string()))
+        })
+    }).unwrap_or(true)
 }
