@@ -183,6 +183,7 @@ nodelay = true # Optional. Same as the client
 blacklist_ip = ["1.2.3.4"] # Optional. IPs added here will be skipped when transferring data.
 whitelist_ip = ["1.2.3.4"] # Optional. IPs added here will work as usual and will skip processing other IPs.
 # The black/white country list is placed after the IP's blacklist/whitelist.
+maxminddb_path = "" # Optional. But it should be required if there are blacklist_country or whitelist_country.
 blacklist_country = ["JP"] # Optional. Countries added here will be skipped when transferring data, it should be define by ISO codes.
 whitelist_country = ["JP"] # Optional. Countries added here will work as usual and will skip processing other Countries, it should be define by ISO codes.
 
