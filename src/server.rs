@@ -764,12 +764,10 @@ async fn run_udp_connection_pool<T: Transport>(
 }
 
 fn is_blacklisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref blacklist) = config.blacklist_ip {
+    config.blacklist_ip.as_ref().and_then(|blacklist| {
         let from_ip = sock.ip();
-        blacklist.contains(&from_ip)
-    } else {
-        false
-    }
+        Some(blacklist.contains(&from_ip))
+    }).unwrap_or(false)
 }
 
 fn is_blacklisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
@@ -789,12 +787,10 @@ fn is_blacklisted_country(config: &ServerServiceConfig, sock: &std::net::SocketA
 }
 
 fn is_whitelisted_ip(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
-    if let Some(ref whitelist) = config.whitelist_ip {
+    config.whitelist_ip.as_ref().and_then(|whitelist| {
         let from_ip = sock.ip();
-        whitelist.contains(&from_ip)
-    } else {
-        true
-    }
+        Some(whitelist.contains(&from_ip))
+    }).unwrap_or(true)
 }
 
 fn is_whitelisted_country(config: &ServerServiceConfig, sock: &std::net::SocketAddr) -> bool {
